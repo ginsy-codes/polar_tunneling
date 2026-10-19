@@ -2,13 +2,14 @@
 Pull 2025 pitch-level Statcast data via pybaseball and write selected columns to CSV.
 
 Intended as the primary training set for the polar tunneling model.
+Pitcher-focused only (batter ID removed).
 
-Required columns:
-- pitcher, batter (MLBAM IDs)
-- release_pos_x, release_pos_y, release_pos_z
-- ax, ay, az
-- release_speed
-- pfx_x, pfx_z
+Columns (with units where applicable):
+- pitcher (MLBAM ID)
+- release_pos_x_ft, release_pos_y_ft, release_pos_z_ft
+- ax_ft_s2, ay_ft_s2, az_ft_s2
+- release_speed_mph
+- pfx_x_ft, pfx_z_ft
 - description (per-pitch outcome)
 - events (plate-appearance outcome)
 
@@ -18,7 +19,10 @@ Usage:
 """
 
 import pandas as pd
-from pybaseball import statcast
+from pybaseball import statcast, cache
+
+# Enable caching so large queries can be resumed if interrupted
+cache.enable()
 
 # Date range for the 2025 regular season (approximate; adjust as needed)
 START_DATE = "2025-03-20"
@@ -28,7 +32,6 @@ OUTPUT_PATH = "datamining/pitches_2025.csv"
 # Columns needed for trajectory work and identification
 COLUMNS = [
     "pitcher",          # MLBAM ID of pitcher
-    "batter",           # MLBAM ID of batter
     "release_pos_x",
     "release_pos_y",
     "release_pos_z",
@@ -38,15 +41,28 @@ COLUMNS = [
     "release_speed",
     "pfx_x",
     "pfx_z",
-    "description",      # per-pitch outcome (ball, called_strike, swinging_strike, hit_into_play, etc.)
-    "events",           # plate-appearance outcome (strikeout, single, home_run, field_out, etc.; null on non-terminal pitches)
-    # Useful extras often needed later (can be trimmed)
+    "description",      # per-pitch outcome
+    "events",           # plate-appearance outcome (null on non-terminal pitches)
+    # Useful extras
     "pitch_type",
     "game_date",
     "game_pk",
     "at_bat_number",
     "pitch_number",
 ]
+
+# Rename to include units
+RENAME = {
+    "release_pos_x": "release_pos_x_ft",
+    "release_pos_y": "release_pos_y_ft",
+    "release_pos_z": "release_pos_z_ft",
+    "ax": "ax_ft_s2",
+    "ay": "ay_ft_s2",
+    "az": "az_ft_s2",
+    "release_speed": "release_speed_mph",
+    "pfx_x": "pfx_x_ft",
+    "pfx_z": "pfx_z_ft",
+}
 
 def main():
     print(f"Pulling Statcast data from {START_DATE} to {END_DATE}...")
@@ -60,8 +76,9 @@ def main():
     required = ["pitcher", "release_pos_x", "release_pos_y", "release_pos_z", "ax", "ay", "az"]
     df = df.dropna(subset=[c for c in required if c in df.columns])
     df["pitcher"] = df["pitcher"].astype(int)
-    if "batter" in df.columns:
-        df["batter"] = df["batter"].astype(int)
+
+    # Add units to column names
+    df = df.rename(columns=RENAME)
 
     print(f"Writing {len(df):,} pitches to {OUTPUT_PATH}")
     df.to_csv(OUTPUT_PATH, index=False)
