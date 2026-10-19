@@ -19,6 +19,7 @@ Usage:
 """
 
 import pandas as pd
+from pathlib import Path
 from pybaseball import statcast, cache
 
 # Enable caching so large queries can be resumed if interrupted
@@ -27,7 +28,8 @@ cache.enable()
 # Date range for the 2025 regular season (approximate; adjust as needed)
 START_DATE = "2025-03-20"
 END_DATE = "2025-10-01"
-OUTPUT_PATH = "datamining/pitches_2025.csv"
+OUTPUT_DIR = Path("datamining/outputs")
+OUTPUT_PATH = OUTPUT_DIR / "pitches_2025.csv"
 
 # Columns needed for trajectory work and identification
 COLUMNS = [
@@ -65,6 +67,7 @@ RENAME = {
 }
 
 def main():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Pulling Statcast data from {START_DATE} to {END_DATE}...")
     df = statcast(start_dt=START_DATE, end_dt=END_DATE, verbose=True, parallel=True)
 

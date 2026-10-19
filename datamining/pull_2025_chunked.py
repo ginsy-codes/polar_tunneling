@@ -13,7 +13,7 @@ from pybaseball import statcast, cache
 cache.enable()
 
 YEAR = 2025
-OUTPUT_DIR = Path("datamining")
+OUTPUT_DIR = Path("datamining/outputs")
 FINAL_PATH = OUTPUT_DIR / f"pitches_{YEAR}.csv"
 
 # Approximate regular-season months
@@ -102,10 +102,6 @@ def main():
     full = pd.concat(frames, ignore_index=True)
     full.to_csv(FINAL_PATH, index=False)
     print(f"Wrote {len(full):,} pitches to {FINAL_PATH}")
-
-    # Optional cleanup of chunks
-    # for p in chunk_paths:
-    #     p.unlink()
 
 if __name__ == "__main__":
     main()

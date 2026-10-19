@@ -30,8 +30,8 @@ def main():
     parser.add_argument("--year", type=int, required=True, choices=[2025, 2026])
     args = parser.parse_args()
 
-    input_path = Path(f"datamining/pitches_{args.year}.csv")
-    output_path = Path(f"datamining/pitch_averages_{args.year}.csv")
+    input_path = Path(f"datamining/outputs/pitches_{args.year}.csv")
+    output_path = Path(f"datamining/outputs/pitch_averages_{args.year}.csv")
 
     if not input_path.exists():
         raise FileNotFoundError(f"Pitch data not found: {input_path}. Run the pull script first.")
