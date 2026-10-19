@@ -7,7 +7,8 @@ Required columns:
 - ax, ay, az
 - release_speed
 - pfx_x, pfx_z
-- outcome (description)
+- description (per-pitch outcome)
+- events (plate-appearance outcome)
 
 Usage:
     pip install pybaseball pandas
@@ -35,7 +36,8 @@ COLUMNS = [
     "release_speed",
     "pfx_x",
     "pfx_z",
-    "description",      # outcome (ball, called_strike, swinging_strike, in_play, etc.)
+    "description",      # per-pitch outcome (ball, called_strike, swinging_strike, hit_into_play, etc.)
+    "events",           # plate-appearance outcome (strikeout, single, home_run, field_out, etc.; null on non-terminal pitches)
     # Useful extras often needed later (can be trimmed)
     "pitch_type",
     "game_date",
