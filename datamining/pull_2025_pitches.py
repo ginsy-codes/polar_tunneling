@@ -9,7 +9,7 @@ Columns (with units where applicable):
 - release_pos_x_ft, release_pos_y_ft, release_pos_z_ft
 - ax_ft_s2, ay_ft_s2, az_ft_s2
 - release_speed_mph
-- pfx_x_ft, pfx_z_ft
+- plate_x_ft, plate_z_ft
 - description (per-pitch outcome)
 - events (plate-appearance outcome)
 
@@ -41,8 +41,8 @@ COLUMNS = [
     "ay",
     "az",
     "release_speed",
-    "pfx_x",
-    "pfx_z",
+    "plate_x",
+    "plate_z",
     "description",      # per-pitch outcome
     "events",           # plate-appearance outcome (null on non-terminal pitches)
     # Useful extras
@@ -62,8 +62,8 @@ RENAME = {
     "ay": "ay_ft_s2",
     "az": "az_ft_s2",
     "release_speed": "release_speed_mph",
-    "pfx_x": "pfx_x_ft",
-    "pfx_z": "pfx_z_ft",
+    "plate_x": "plate_x_ft",
+    "plate_z": "plate_z_ft",
 }
 
 def main():

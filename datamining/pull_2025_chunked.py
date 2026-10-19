@@ -37,8 +37,8 @@ COLUMNS = [
     "ay",
     "az",
     "release_speed",
-    "pfx_x",
-    "pfx_z",
+    "plate_x",
+    "plate_z",
     "description",
     "events",
     "pitch_type",
@@ -56,8 +56,8 @@ RENAME = {
     "ay": "ay_ft_s2",
     "az": "az_ft_s2",
     "release_speed": "release_speed_mph",
-    "pfx_x": "pfx_x_ft",
-    "pfx_z": "pfx_z_ft",
+    "plate_x": "plate_x_ft",
+    "plate_z": "plate_z_ft",
 }
 
 def process_chunk(start, end):

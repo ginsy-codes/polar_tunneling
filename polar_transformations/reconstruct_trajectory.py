@@ -4,7 +4,7 @@ Reconstruct a pitch trajectory under the constant-acceleration model.
 Assumptions:
 - Constant acceleration (ax, ay, az) for the full flight.
 - Release position: release_pos_x/y/z
-- Plate crossing: y = 0, x = pfx_x, z = pfx_z
+- Plate crossing: y = 0, x = plate_x, z = plate_z
   (using pfx as a proxy for final location for simplicity)
 - t = 0 at release
 
@@ -45,7 +45,7 @@ def estimate_flight_time(release_speed_mph, y0):
 def reconstruct_trajectory(
     release_pos_x, release_pos_y, release_pos_z,
     ax, ay, az,
-    pfx_x, pfx_z,
+    plate_x, plate_z,
     release_speed_mph,
     dt=0.01,
 ):
@@ -57,7 +57,7 @@ def reconstruct_trajectory(
     vx0, vy0, vz0 = solve_initial_velocity(
         release_pos_x, release_pos_y, release_pos_z,
         ax, ay, az,
-        pfx_x, pfx_z,
+        plate_x, plate_z,
         t_flight,
     )
 
@@ -69,9 +69,9 @@ def reconstruct_trajectory(
     # Ensure last point is exactly at plate if close
     if ys[-1] > 0:
         times = np.append(times, t_flight)
-        xs = np.append(xs, pfx_x)
+        xs = np.append(xs, plate_x)
         ys = np.append(ys, 0.0)
-        zs = np.append(zs, pfx_z)
+        zs = np.append(zs, plate_z)
 
     return pd.DataFrame({"t": times, "x": xs, "y": ys, "z": zs})
 
@@ -83,8 +83,8 @@ def main():
     parser.add_argument("--ax", type=float, required=True)
     parser.add_argument("--ay", type=float, required=True)
     parser.add_argument("--az", type=float, required=True)
-    parser.add_argument("--pfx_x", type=float, required=True)
-    parser.add_argument("--pfx_z", type=float, required=True)
+    parser.add_argument("--plate_x", type=float, required=True)
+    parser.add_argument("--plate_z", type=float, required=True)
     parser.add_argument("--release_speed", type=float, required=True)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--output", type=str, default=None)
@@ -93,7 +93,7 @@ def main():
     traj = reconstruct_trajectory(
         args.release_pos_x, args.release_pos_y, args.release_pos_z,
         args.ax, args.ay, args.az,
-        args.pfx_x, args.pfx_z,
+        args.plate_x, args.plate_z,
         args.release_speed,
         dt=args.dt,
     )

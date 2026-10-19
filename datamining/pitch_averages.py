@@ -21,8 +21,8 @@ AVG_COLS = [
     "ay_ft_s2",
     "az_ft_s2",
     "release_speed_mph",
-    "pfx_x_ft",
-    "pfx_z_ft",
+    "plate_x_ft",
+    "plate_z_ft",
 ]
 
 def main():
