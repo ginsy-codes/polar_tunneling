@@ -1,7 +1,7 @@
 """
 Pull 2025 pitch-level Statcast data via pybaseball and write selected columns to CSV.
 
-Intended as the evaluation / hold-out set for the polar tunneling model.
+Intended as the primary training set for the polar tunneling model.
 
 Required columns:
 - pitcher, batter (MLBAM IDs)
