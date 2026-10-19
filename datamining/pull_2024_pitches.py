@@ -2,9 +2,12 @@
 Pull 2024 pitch-level Statcast data via pybaseball and write selected columns to CSV.
 
 Required columns:
-- pitcher (MLBAM ID)
-- batter (MLBAM ID)
+- pitcher, batter (MLBAM IDs)
 - release_pos_x, release_pos_y, release_pos_z
+- ax, ay, az
+- release_speed
+- pfx_x, pfx_z
+- outcome (description)
 
 Usage:
     pip install pybaseball pandas
@@ -26,8 +29,14 @@ COLUMNS = [
     "release_pos_x",
     "release_pos_y",
     "release_pos_z",
-    # Useful extras often needed later (can be trimmed)
+    "ax",
+    "ay",
+    "az",
     "release_speed",
+    "pfx_x",
+    "pfx_z",
+    "description",      # outcome (ball, called_strike, swinging_strike, in_play, etc.)
+    # Useful extras often needed later (can be trimmed)
     "pitch_type",
     "game_date",
     "game_pk",
@@ -44,9 +53,11 @@ def main():
     df = df[available].copy()
 
     # Basic cleanup
-    df = df.dropna(subset=["pitcher", "release_pos_x", "release_pos_y", "release_pos_z"])
+    required = ["pitcher", "release_pos_x", "release_pos_y", "release_pos_z", "ax", "ay", "az"]
+    df = df.dropna(subset=[c for c in required if c in df.columns])
     df["pitcher"] = df["pitcher"].astype(int)
-    df["batter"] = df["batter"].astype(int)
+    if "batter" in df.columns:
+        df["batter"] = df["batter"].astype(int)
 
     print(f"Writing {len(df):,} pitches to {OUTPUT_PATH}")
     df.to_csv(OUTPUT_PATH, index=False)
