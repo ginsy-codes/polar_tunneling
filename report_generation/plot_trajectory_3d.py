@@ -27,7 +27,7 @@ def plot_trajectories(
     show=True,
 ):
     """
-    Plot one or more trajectories in 3D.
+    Plot one or more trajectories in 3D with equal axis scaling.
 
     Parameters
     ----------
@@ -47,9 +47,19 @@ def plot_trajectories(
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
 
+    all_x, all_y, all_z = [], [], []
     for i, traj in enumerate(trajectories):
         label = labels[i] if labels and i < len(labels) else f"Pitch {i+1}"
         ax.plot(traj["x"], traj["y"], traj["z"], label=label, linewidth=2)
+        all_x.extend(traj["x"])
+        all_y.extend(traj["y"])
+        all_z.extend(traj["z"])
+
+    # Equal scale: set box aspect from data ranges so 1 ft looks the same on each axis
+    x_range = max(all_x) - min(all_x) if all_x else 1
+    y_range = max(all_y) - min(all_y) if all_y else 1
+    z_range = max(all_z) - min(all_z) if all_z else 1
+    ax.set_box_aspect((x_range, y_range, z_range))
 
     ax.set_xlabel("x (ft)")
     ax.set_ylabel("y (ft)")
