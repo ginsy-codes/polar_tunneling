@@ -9,6 +9,7 @@ polar_transformations.to_polar for the chosen handedness.
 
 The coordinate system is rotated so the vector from the batter's eye to the
 pitcher release point points directly into the page (positive depth).
+Vertical is constrained so the original +z (up) remains positive vertical.
 The horizontal axis is justified to the most negative of:
   - the batter eye (origin)
   - the release point
@@ -49,33 +50,35 @@ def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
 
 def _rotate_so_release_is_depth(traj: pd.DataFrame) -> pd.DataFrame:
     """
-    Rotate the trajectory so the first point (release) lies on the positive
-    depth (y) axis. Horizontal (x) and vertical (z) remain orthogonal.
+    Rotate so the release point lies on the positive depth axis, while keeping
+    the new vertical axis oriented with the original +z (up).
     """
-    # Release point is the first row (t=0)
     rx, ry, rz = traj.iloc[0][["x", "y", "z"]].to_numpy()
-    # Vector from origin to release
     v = np.array([rx, ry, rz])
     norm = np.linalg.norm(v)
     if norm < 1e-6:
         return traj.copy()
-    # New depth direction = unit vector toward release
-    depth = v / norm
-    # Choose a horizontal direction perpendicular to depth (prefer world-x)
-    world_x = np.array([1.0, 0.0, 0.0])
-    horiz = np.cross(depth, world_x)
+    depth = v / norm  # positive depth toward release
+
+    # Prefer original +z as the up reference
+    world_up = np.array([0.0, 0.0, 1.0])
+    # Horizontal = depth × up, then flip if needed so it is consistent
+    horiz = np.cross(depth, world_up)
     if np.linalg.norm(horiz) < 1e-6:
-        world_x = np.array([0.0, 1.0, 0.0])
-        horiz = np.cross(depth, world_x)
+        # Depth nearly parallel to z; fall back to world x
+        horiz = np.cross(depth, np.array([1.0, 0.0, 0.0]))
     horiz = horiz / np.linalg.norm(horiz)
-    # Vertical completes the right-handed frame
+
+    # Vertical = horiz × depth, then ensure it has positive component along original +z
     vert = np.cross(horiz, depth)
     vert = vert / np.linalg.norm(vert)
+    if vert[2] < 0:
+        vert = -vert
+        horiz = -horiz  # keep right-handed
 
     pts = traj[["x", "y", "z"]].to_numpy()
-    # Project onto the new basis
     new_x = pts @ horiz
-    new_y = pts @ depth   # depth toward release
+    new_y = pts @ depth
     new_z = pts @ vert
 
     out = traj.copy()
@@ -95,7 +98,8 @@ def plot_trajectories(
     """
     Plot one or more trajectories in 3D from the batter's viewpoint.
     The origin (0, 0, 0) is exactly the batter's eye.
-    The view is rotated so the eye-to-release line points into the page.
+    The view is rotated so the eye-to-release line points into the page,
+    and original +z remains upward.
     """
     if isinstance(trajectories, pd.DataFrame):
         trajectories = [trajectories]
