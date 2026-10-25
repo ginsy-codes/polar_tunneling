@@ -1,15 +1,18 @@
 """
-3D visualization of pitch trajectories.
+3D visualization of pitch trajectories from a batter's viewpoint.
 
 Input: a DataFrame (or list of DataFrames) with columns t, x, y, z
         as produced by polar_transformations.reconstruct_trajectory.
 
+The plot origin is shifted to the batter's eye position defined in
+polar_transformations.to_polar (RHH or LHH).
+
 Usage (as library):
     from report_generation.plot_trajectory_3d import plot_trajectories
-    plot_trajectories([traj_df1, traj_df2], labels=["FF", "SL"])
+    plot_trajectories(traj, handedness="R", labels=["SL"])
 
-Usage (CLI — expects a CSV with columns t,x,y,z):
-    python plot_trajectory_3d.py path/to/trajectory.csv --output plot.png
+Usage (CLI):
+    python plot_trajectory_3d.py trajectory.csv --handedness R --output plot.png
 """
 
 import argparse
@@ -19,56 +22,80 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
+# Origins in feet (matching to_polar.py)
+IN_TO_FT = 1.0 / 12.0
+ORIGIN_Z = 65.0 * IN_TO_FT
+ORIGIN_Y = -28.3 * IN_TO_FT
+ORIGIN_X_RHH = 35.8 * IN_TO_FT
+ORIGIN_X_LHH = -35.8 * IN_TO_FT
+
+def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
+    """Return a copy of traj with coordinates relative to the batter origin."""
+    ox = ORIGIN_X_RHH if handedness.upper() == "R" else ORIGIN_X_LHH
+    shifted = traj.copy()
+    shifted["x"] = traj["x"] - ox
+    shifted["y"] = traj["y"] - ORIGIN_Y
+    shifted["z"] = traj["z"] - ORIGIN_Z
+    return shifted
+
 def plot_trajectories(
     trajectories,
+    handedness: str = "R",
     labels=None,
-    title="Pitch Trajectories",
+    title=None,
     output_path=None,
     show=True,
 ):
     """
-    Plot one or more trajectories in 3D with equal axis scaling.
+    Plot one or more trajectories in 3D from the batter's viewpoint.
 
     Parameters
     ----------
     trajectories : list of pd.DataFrame or single pd.DataFrame
-        Each DataFrame must contain columns: x, y, z (t is optional).
+        Each must contain columns x, y, z.
+    handedness : str
+        "R" for right-handed hitter origin, "L" for left-handed.
     labels : list of str, optional
-        Legend labels, one per trajectory.
-    title : str
+    title : str, optional
     output_path : str or Path, optional
-        If given, save the figure to this path.
     show : bool
-        Whether to call plt.show().
     """
     if isinstance(trajectories, pd.DataFrame):
         trajectories = [trajectories]
+
+    handedness = handedness.upper()
+    if handedness not in ("R", "L"):
+        raise ValueError("handedness must be 'R' or 'L'")
+
+    if title is None:
+        title = f"Pitch Trajectories ({handedness}HH viewpoint)"
 
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
 
     all_x, all_y, all_z = [], [], []
     for i, traj in enumerate(trajectories):
+        shifted = _shift_to_viewpoint(traj, handedness)
         label = labels[i] if labels and i < len(labels) else f"Pitch {i+1}"
-        ax.plot(traj["x"], traj["y"], traj["z"], label=label, linewidth=2)
-        all_x.extend(traj["x"])
-        all_y.extend(traj["y"])
-        all_z.extend(traj["z"])
+        ax.plot(shifted["x"], shifted["y"], shifted["z"], label=label, linewidth=2)
+        all_x.extend(shifted["x"])
+        all_y.extend(shifted["y"])
+        all_z.extend(shifted["z"])
 
-    # Equal scale: set box aspect from data ranges so 1 ft looks the same on each axis
+    # Equal scale
     x_range = max(all_x) - min(all_x) if all_x else 1
     y_range = max(all_y) - min(all_y) if all_y else 1
     z_range = max(all_z) - min(all_z) if all_z else 1
     ax.set_box_aspect((x_range, y_range, z_range))
 
-    ax.set_xlabel("x (ft)")
-    ax.set_ylabel("y (ft)")
-    ax.set_zlabel("z (ft)")
+    ax.set_xlabel("x relative to batter (ft)")
+    ax.set_ylabel("y relative to batter (ft)")
+    ax.set_zlabel("z relative to batter (ft)")
     ax.set_title(title)
     ax.legend()
 
-    # Reasonable default view (catcher perspective-ish)
-    ax.view_init(elev=20, azim=-60)
+    # View roughly looking toward the plate from the batter
+    ax.view_init(elev=15, azim=-90)
 
     plt.tight_layout()
 
@@ -82,11 +109,13 @@ def plot_trajectories(
         plt.close()
 
 def main():
-    parser = argparse.ArgumentParser(description="Plot a 3D pitch trajectory from CSV")
+    parser = argparse.ArgumentParser(description="Plot a 3D pitch trajectory from batter viewpoint")
     parser.add_argument("csv", type=str, help="Path to trajectory CSV (columns: t, x, y, z)")
+    parser.add_argument("--handedness", type=str, default="R", choices=["R", "L", "r", "l"],
+                        help="Batter handedness for viewpoint origin")
     parser.add_argument("--output", type=str, default=None, help="Save figure to this path")
-    parser.add_argument("--title", type=str, default="Pitch Trajectory")
-    parser.add_argument("--no-show", action="store_true", help="Do not display the plot")
+    parser.add_argument("--title", type=str, default=None)
+    parser.add_argument("--no-show", action="store_true")
     args = parser.parse_args()
 
     traj = pd.read_csv(args.csv)
@@ -96,6 +125,7 @@ def main():
 
     plot_trajectories(
         traj,
+        handedness=args.handedness,
         title=args.title,
         output_path=args.output,
         show=not args.no_show,
