@@ -5,8 +5,14 @@ Input: a DataFrame (or list of DataFrames) with columns t, x, y, z
         as produced by polar_transformations.reconstruct_trajectory.
 
 The plot origin (0, 0, 0) is exactly the batter's eye position defined in
-polar_transformations.to_polar for the chosen handedness. The camera looks
-down the tunnel toward the plate.
+polar_transformations.to_polar for the chosen handedness.
+
+The coordinate system is rotated so the vector from the batter's eye to the
+pitcher release point points directly into the page (positive depth).
+The horizontal axis is justified to the most negative of:
+  - the batter eye (origin)
+  - the release point
+  - the most-negative point on the trajectory
 
 Usage (as library):
     from report_generation.plot_trajectory_3d import plot_trajectories
@@ -19,6 +25,7 @@ Usage (CLI):
 import argparse
 from pathlib import Path
 
+import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -40,6 +47,43 @@ def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
     shifted["z"] = traj["z"] - ORIGIN_Z
     return shifted
 
+def _rotate_so_release_is_depth(traj: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rotate the trajectory so the first point (release) lies on the positive
+    depth (y) axis. Horizontal (x) and vertical (z) remain orthogonal.
+    """
+    # Release point is the first row (t=0)
+    rx, ry, rz = traj.iloc[0][["x", "y", "z"]].to_numpy()
+    # Vector from origin to release
+    v = np.array([rx, ry, rz])
+    norm = np.linalg.norm(v)
+    if norm < 1e-6:
+        return traj.copy()
+    # New depth direction = unit vector toward release
+    depth = v / norm
+    # Choose a horizontal direction perpendicular to depth (prefer world-x)
+    world_x = np.array([1.0, 0.0, 0.0])
+    horiz = np.cross(depth, world_x)
+    if np.linalg.norm(horiz) < 1e-6:
+        world_x = np.array([0.0, 1.0, 0.0])
+        horiz = np.cross(depth, world_x)
+    horiz = horiz / np.linalg.norm(horiz)
+    # Vertical completes the right-handed frame
+    vert = np.cross(horiz, depth)
+    vert = vert / np.linalg.norm(vert)
+
+    pts = traj[["x", "y", "z"]].to_numpy()
+    # Project onto the new basis
+    new_x = pts @ horiz
+    new_y = pts @ depth   # depth toward release
+    new_z = pts @ vert
+
+    out = traj.copy()
+    out["x"] = new_x
+    out["y"] = new_y
+    out["z"] = new_z
+    return out
+
 def plot_trajectories(
     trajectories,
     handedness: str = "R",
@@ -51,6 +95,7 @@ def plot_trajectories(
     """
     Plot one or more trajectories in 3D from the batter's viewpoint.
     The origin (0, 0, 0) is exactly the batter's eye.
+    The view is rotated so the eye-to-release line points into the page.
     """
     if isinstance(trajectories, pd.DataFrame):
         trajectories = [trajectories]
@@ -65,20 +110,28 @@ def plot_trajectories(
     fig = plt.figure(figsize=(12, 9))
     ax = fig.add_axes([0.02, 0.02, 0.96, 0.90], projection="3d")
 
-    all_x, all_y, all_z = [0.0], [0.0], [0.0]  # ensure origin is included
+    all_x, all_y, all_z = [0.0], [0.0], [0.0]
+    release_xs = [0.0]
+
     for i, traj in enumerate(trajectories):
         shifted = _shift_to_viewpoint(traj, handedness)
+        rotated = _rotate_so_release_is_depth(shifted)
         label = labels[i] if labels and i < len(labels) else f"Pitch {i+1}"
-        ax.plot(shifted["x"], shifted["y"], shifted["z"], label=label, linewidth=2)
-        all_x.extend(shifted["x"])
-        all_y.extend(shifted["y"])
-        all_z.extend(shifted["z"])
+        ax.plot(rotated["x"], rotated["y"], rotated["z"], label=label, linewidth=2)
+        all_x.extend(rotated["x"])
+        all_y.extend(rotated["y"])
+        all_z.extend(rotated["z"])
+        release_xs.append(rotated.iloc[0]["x"])
 
-    # Force axis limits so origin is included
+    # Most-negative horizontal reference among origin, release, and trajectory
+    candidates = [0.0, min(release_xs), min(all_x)]
+    x_left = min(candidates)
     pad = 1.0
-    x_min, x_max = min(all_x), max(all_x)
+    x_min = x_left
+    x_max = max(all_x)
     y_min, y_max = min(all_y), max(all_y)
     z_min, z_max = min(all_z), max(all_z)
+
     ax.set_xlim(x_min - pad, x_max + pad)
     ax.set_ylim(y_min - pad, y_max + pad)
     ax.set_zlim(z_min - pad, z_max + pad)
@@ -87,13 +140,13 @@ def plot_trajectories(
     ax.scatter([0], [0], [0], color="red", s=80, label="Batter eye")
 
     ax.set_xlabel("horizontal (ft)", fontsize=11, labelpad=6)
-    ax.set_ylabel("depth toward plate (ft)", fontsize=11, labelpad=6)
+    ax.set_ylabel("depth toward release (ft)", fontsize=11, labelpad=6)
     ax.set_zlabel("vertical (ft)", fontsize=11, labelpad=6)
     ax.set_title(title, fontsize=13, pad=8)
     ax.legend(loc="upper right", fontsize=10)
 
-    # Look down the tunnel from the origin toward positive y
-    ax.view_init(elev=8, azim=-90)
+    # Look along positive depth (eye -> release points into the page)
+    ax.view_init(elev=0, azim=-90)
 
     if output_path:
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
