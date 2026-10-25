@@ -4,8 +4,9 @@
 Input: a DataFrame (or list of DataFrames) with columns t, x, y, z
         as produced by polar_transformations.reconstruct_trajectory.
 
-The plot origin is shifted to the batter's eye position defined in
-polar_transformations.to_polar (RHH or LHH).
+The plot origin is the batter's eye position defined in
+polar_transformations.to_polar (RHH or LHH). The camera looks down
+the tunnel toward the plate so the view approximates what the hitter sees.
 
 Usage (as library):
     from report_generation.plot_trajectory_3d import plot_trajectories
@@ -77,25 +78,27 @@ def plot_trajectories(
     for i, traj in enumerate(trajectories):
         shifted = _shift_to_viewpoint(traj, handedness)
         label = labels[i] if labels and i < len(labels) else f"Pitch {i+1}"
+        # Plot so positive y (toward plate) recedes; x is horizontal, z is vertical
         ax.plot(shifted["x"], shifted["y"], shifted["z"], label=label, linewidth=2)
         all_x.extend(shifted["x"])
         all_y.extend(shifted["y"])
         all_z.extend(shifted["z"])
 
-    # Equal scale
+    # Equal scale so distances are true
     x_range = max(all_x) - min(all_x) if all_x else 1
     y_range = max(all_y) - min(all_y) if all_y else 1
     z_range = max(all_z) - min(all_z) if all_z else 1
     ax.set_box_aspect((x_range, y_range, z_range))
 
-    ax.set_xlabel("x relative to batter (ft)")
-    ax.set_ylabel("y relative to batter (ft)")
-    ax.set_zlabel("z relative to batter (ft)")
+    ax.set_xlabel("horizontal (ft)")
+    ax.set_ylabel("depth toward plate (ft)")
+    ax.set_zlabel("vertical (ft)")
     ax.set_title(title)
-    ax.legend()
+    ax.legend(loc="upper right")
 
-    # View roughly looking toward the plate from the batter
-    ax.view_init(elev=15, azim=-90)
+    # Camera at the origin looking down the tunnel (positive y toward the plate).
+    # elev ~ 0 keeps the horizon level; azim = -90 looks along +y.
+    ax.view_init(elev=5, azim=-90)
 
     plt.tight_layout()
 
