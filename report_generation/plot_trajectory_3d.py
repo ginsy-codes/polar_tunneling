@@ -61,9 +61,8 @@ def plot_trajectories(
     if title is None:
         title = f"Pitch Trajectories ({handedness}HH viewpoint)"
 
-    fig = plt.figure(figsize=(14, 10))
-    # Position the axes to fill most of the figure
-    ax = fig.add_axes([0.05, 0.05, 0.9, 0.85], projection="3d")
+    fig = plt.figure(figsize=(12, 9))
+    ax = fig.add_axes([0.02, 0.02, 0.96, 0.90], projection="3d")
 
     all_x, all_y, all_z = [0.0], [0.0], [0.0]  # ensure origin is included
     for i, traj in enumerate(trajectories):
@@ -74,32 +73,29 @@ def plot_trajectories(
         all_y.extend(shifted["y"])
         all_z.extend(shifted["z"])
 
-    # Equal scale
+    # Force axis limits so origin is included
+    pad = 1.0
     x_min, x_max = min(all_x), max(all_x)
     y_min, y_max = min(all_y), max(all_y)
     z_min, z_max = min(all_z), max(all_z)
-    x_range = x_max - x_min or 1
-    y_range = y_max - y_min or 1
-    z_range = z_max - z_min or 1
-    ax.set_box_aspect((x_range, y_range, z_range))
-
-    # Force axis limits so origin is included
-    pad = 0.5
     ax.set_xlim(x_min - pad, x_max + pad)
     ax.set_ylim(y_min - pad, y_max + pad)
     ax.set_zlim(z_min - pad, z_max + pad)
 
-    # Mark the origin (batter's eye)
-    ax.scatter([0], [0], [0], color="red", s=60, label="Batter eye")
+    # Do not force equal box aspect — let the plot fill the available axes area.
+    # Distances remain labeled in feet; the view is still looking down the tunnel.
 
-    ax.set_xlabel("horizontal (ft)", fontsize=12, labelpad=8)
-    ax.set_ylabel("depth toward plate (ft)", fontsize=12, labelpad=8)
-    ax.set_zlabel("vertical (ft)", fontsize=12, labelpad=8)
-    ax.set_title(title, fontsize=14, pad=12)
-    ax.legend(loc="upper right", fontsize=11)
+    # Mark the origin (batter's eye)
+    ax.scatter([0], [0], [0], color="red", s=80, label="Batter eye")
+
+    ax.set_xlabel("horizontal (ft)", fontsize=11, labelpad=6)
+    ax.set_ylabel("depth toward plate (ft)", fontsize=11, labelpad=6)
+    ax.set_zlabel("vertical (ft)", fontsize=11, labelpad=6)
+    ax.set_title(title, fontsize=13, pad=8)
+    ax.legend(loc="upper right", fontsize=10)
 
     # Look down the tunnel from the origin toward positive y
-    ax.view_init(elev=5, azim=-90)
+    ax.view_init(elev=8, azim=-90)
 
     if output_path:
         plt.savefig(output_path, dpi=150, bbox_inches="tight")
