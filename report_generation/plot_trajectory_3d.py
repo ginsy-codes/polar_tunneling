@@ -61,7 +61,8 @@ def plot_trajectories(
     if title is None:
         title = f"Pitch Trajectories ({handedness}HH viewpoint)"
 
-    fig = plt.figure(figsize=(10, 8))
+    # Larger figure for readability
+    fig = plt.figure(figsize=(16, 12))
     ax = fig.add_subplot(111, projection="3d")
 
     all_x, all_y, all_z = [0.0], [0.0], [0.0]  # ensure origin is included
@@ -82,21 +83,20 @@ def plot_trajectories(
     z_range = z_max - z_min or 1
     ax.set_box_aspect((x_range, y_range, z_range))
 
-    # Force axis limits so origin is exactly at the near corner / edge
-    # Pad slightly so the origin marker is visible
+    # Force axis limits so origin is included
     pad = 0.5
     ax.set_xlim(x_min - pad, x_max + pad)
     ax.set_ylim(y_min - pad, y_max + pad)
     ax.set_zlim(z_min - pad, z_max + pad)
 
     # Mark the origin (batter's eye)
-    ax.scatter([0], [0], [0], color="red", s=40, label="Batter eye")
+    ax.scatter([0], [0], [0], color="red", s=60, label="Batter eye")
 
-    ax.set_xlabel("horizontal (ft)")
-    ax.set_ylabel("depth toward plate (ft)")
-    ax.set_zlabel("vertical (ft)")
-    ax.set_title(title)
-    ax.legend(loc="upper right")
+    ax.set_xlabel("horizontal (ft)", fontsize=12)
+    ax.set_ylabel("depth toward plate (ft)", fontsize=12)
+    ax.set_zlabel("vertical (ft)", fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc="upper right", fontsize=11)
 
     # Look down the tunnel from the origin toward positive y
     ax.view_init(elev=5, azim=-90)
