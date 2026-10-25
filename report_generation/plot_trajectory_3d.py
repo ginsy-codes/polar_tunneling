@@ -144,7 +144,8 @@ def plot_trajectories(
     ax.scatter([0], [0], [0], color="red", s=80, label="Batter eye")
 
     ax.set_xlabel("horizontal (ft)", fontsize=11, labelpad=6)
-    ax.set_ylabel("depth toward release (ft)", fontsize=11, labelpad=6)
+    ax.set_ylabel("")  # depth labels are illegible when looking down the tunnel
+    ax.set_yticklabels([])
     ax.set_zlabel("vertical (ft)", fontsize=11, labelpad=6)
     ax.set_title(title, fontsize=13, pad=8)
     ax.legend(loc="upper right", fontsize=10)
