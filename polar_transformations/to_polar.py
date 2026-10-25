@@ -5,7 +5,8 @@ batter-centric origins for both right-handed (RHH) and left-handed (LHH) hitters
 Origins (in inches, then converted to feet to match trajectory units):
 - z = 65"
 - y = -28.3"
-- x = +35.8" (RHH) or -35.8" (LHH)
+- x = -35.8" (RHH) or +35.8" (LHH)
+  (RHH stands on the negative-x side in Statcast / catcher's-view coordinates)
 
 Polar definitions (relative to the origin):
 - r     : Euclidean distance from origin
@@ -23,8 +24,8 @@ import pandas as pd
 # Origins in inches
 ORIGIN_Z_IN = 65.0
 ORIGIN_Y_IN = -28.3
-ORIGIN_X_RHH_IN = 35.8
-ORIGIN_X_LHH_IN = -35.8
+ORIGIN_X_RHH_IN = -35.8
+ORIGIN_X_LHH_IN = 35.8
 
 # Convert to feet (Statcast trajectory units)
 IN_TO_FT = 1.0 / 12.0

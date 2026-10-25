@@ -24,11 +24,12 @@ import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 # Origins in feet (matching to_polar.py)
+# RHH stands on the negative-x side in Statcast coordinates
 IN_TO_FT = 1.0 / 12.0
 ORIGIN_Z = 65.0 * IN_TO_FT
 ORIGIN_Y = -28.3 * IN_TO_FT
-ORIGIN_X_RHH = 35.8 * IN_TO_FT
-ORIGIN_X_LHH = -35.8 * IN_TO_FT
+ORIGIN_X_RHH = -35.8 * IN_TO_FT
+ORIGIN_X_LHH = 35.8 * IN_TO_FT
 
 def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
     """Return a copy of traj with coordinates relative to the batter origin."""
@@ -81,9 +82,6 @@ def plot_trajectories(
     ax.set_xlim(x_min - pad, x_max + pad)
     ax.set_ylim(y_min - pad, y_max + pad)
     ax.set_zlim(z_min - pad, z_max + pad)
-
-    # Do not force equal box aspect — let the plot fill the available axes area.
-    # Distances remain labeled in feet; the view is still looking down the tunnel.
 
     # Mark the origin (batter's eye)
     ax.scatter([0], [0], [0], color="red", s=80, label="Batter eye")
