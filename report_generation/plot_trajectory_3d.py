@@ -4,9 +4,9 @@
 Input: a DataFrame (or list of DataFrames) with columns t, x, y, z
         as produced by polar_transformations.reconstruct_trajectory.
 
-The plot origin is the batter's eye position defined in
-polar_transformations.to_polar (RHH or LHH). The camera looks down
-the tunnel toward the plate so the view approximates what the hitter sees.
+The plot origin (0, 0, 0) is exactly the batter's eye position defined in
+polar_transformations.to_polar for the chosen handedness. The camera looks
+down the tunnel toward the plate.
 
 Usage (as library):
     from report_generation.plot_trajectory_3d import plot_trajectories
@@ -49,17 +49,7 @@ def plot_trajectories(
 ):
     """
     Plot one or more trajectories in 3D from the batter's viewpoint.
-
-    Parameters
-    ----------
-    trajectories : list of pd.DataFrame or single pd.DataFrame
-        Each must contain columns x, y, z.
-    handedness : str
-        "R" for right-handed hitter origin, "L" for left-handed.
-    labels : list of str, optional
-    title : str, optional
-    output_path : str or Path, optional
-    show : bool
+    The origin (0, 0, 0) is exactly the batter's eye.
     """
     if isinstance(trajectories, pd.DataFrame):
         trajectories = [trajectories]
@@ -74,21 +64,33 @@ def plot_trajectories(
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
 
-    all_x, all_y, all_z = [], [], []
+    all_x, all_y, all_z = [0.0], [0.0], [0.0]  # ensure origin is included
     for i, traj in enumerate(trajectories):
         shifted = _shift_to_viewpoint(traj, handedness)
         label = labels[i] if labels and i < len(labels) else f"Pitch {i+1}"
-        # Plot so positive y (toward plate) recedes; x is horizontal, z is vertical
         ax.plot(shifted["x"], shifted["y"], shifted["z"], label=label, linewidth=2)
         all_x.extend(shifted["x"])
         all_y.extend(shifted["y"])
         all_z.extend(shifted["z"])
 
-    # Equal scale so distances are true
-    x_range = max(all_x) - min(all_x) if all_x else 1
-    y_range = max(all_y) - min(all_y) if all_y else 1
-    z_range = max(all_z) - min(all_z) if all_z else 1
+    # Equal scale
+    x_min, x_max = min(all_x), max(all_x)
+    y_min, y_max = min(all_y), max(all_y)
+    z_min, z_max = min(all_z), max(all_z)
+    x_range = x_max - x_min or 1
+    y_range = y_max - y_min or 1
+    z_range = z_max - z_min or 1
     ax.set_box_aspect((x_range, y_range, z_range))
+
+    # Force axis limits so origin is exactly at the near corner / edge
+    # Pad slightly so the origin marker is visible
+    pad = 0.5
+    ax.set_xlim(x_min - pad, x_max + pad)
+    ax.set_ylim(y_min - pad, y_max + pad)
+    ax.set_zlim(z_min - pad, z_max + pad)
+
+    # Mark the origin (batter's eye)
+    ax.scatter([0], [0], [0], color="red", s=40, label="Batter eye")
 
     ax.set_xlabel("horizontal (ft)")
     ax.set_ylabel("depth toward plate (ft)")
@@ -96,8 +98,7 @@ def plot_trajectories(
     ax.set_title(title)
     ax.legend(loc="upper right")
 
-    # Camera at the origin looking down the tunnel (positive y toward the plate).
-    # elev ~ 0 keeps the horizon level; azim = -90 looks along +y.
+    # Look down the tunnel from the origin toward positive y
     ax.view_init(elev=5, azim=-90)
 
     plt.tight_layout()
