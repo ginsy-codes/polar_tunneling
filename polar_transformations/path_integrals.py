@@ -56,12 +56,10 @@ def _align_and_diff(target_polar: pd.DataFrame, ref_polar: pd.DataFrame, t_max: 
     dph = np.unwrap(dph)
     return t, dr, dth, dph
 
-def _integrals(t, delta):
-    """Net change and total variation of delta over t."""
+def _total_variation(t, delta):
+    """Total variation of delta over t."""
     d_dt = np.gradient(delta, t)
-    net = delta[-1] - delta[0]
-    total_var = np.trapezoid(np.abs(d_dt), t)
-    return net, total_var
+    return np.trapezoid(np.abs(d_dt), t)
 
 POST_DECISION_MS = 100
 
@@ -96,9 +94,9 @@ def path_integrals(pitcher_id: int, target_type: str, handedness: str = "R") -> 
 
     # Pre-decision window: 0 → t_dec
     t1, dr1, dth1, dph1 = _align_and_diff(tgt_polar, ref_polar, t_dec)
-    net_r1, tv_r1 = _integrals(t1, dr1)
-    net_th1, tv_th1 = _integrals(t1, dth1)
-    net_ph1, tv_ph1 = _integrals(t1, dph1)
+    tv_r1 = _total_variation(t1, dr1)
+    tv_th1 = _total_variation(t1, dth1)
+    tv_ph1 = _total_variation(t1, dph1)
 
     # Post-decision window: t_dec → t_dec + 100 ms
     # Align full series then slice
@@ -112,11 +110,11 @@ def path_integrals(pitcher_id: int, target_type: str, handedness: str = "R") -> 
     mask = (t_full >= t_dec) & (t_full <= t_post)
     t2 = t_full[mask]
     if len(t2) < 2:
-        net_r2 = tv_r2 = net_th2 = tv_th2 = net_ph2 = tv_ph2 = float("nan")
+        tv_r2 = tv_th2 = tv_ph2 = float("nan")
     else:
-        net_r2, tv_r2 = _integrals(t2, dr_full[mask])
-        net_th2, tv_th2 = _integrals(t2, dth_full[mask])
-        net_ph2, tv_ph2 = _integrals(t2, dph_full[mask])
+        tv_r2 = _total_variation(t2, dr_full[mask])
+        tv_th2 = _total_variation(t2, dth_full[mask])
+        tv_ph2 = _total_variation(t2, dph_full[mask])
 
     return {
         "pitcher": pitcher_id,
@@ -124,12 +122,12 @@ def path_integrals(pitcher_id: int, target_type: str, handedness: str = "R") -> 
         "target": target_type,
         "handedness": handedness.upper(),
         "decision_time_ms": t_dec * 1000,
-        "pre_dp_net_r": net_r1, "pre_dp_tv_r": tv_r1,
-        "pre_dp_net_theta": net_th1, "pre_dp_tv_theta": tv_th1,
-        "pre_dp_net_phi": net_ph1, "pre_dp_tv_phi": tv_ph1,
-        "post_dp_net_r": net_r2, "post_dp_tv_r": tv_r2,
-        "post_dp_net_theta": net_th2, "post_dp_tv_theta": tv_th2,
-        "post_dp_net_phi": net_ph2, "post_dp_tv_phi": tv_ph2,
+        "pre_dp_r": tv_r1,
+        "pre_dp_theta": tv_th1,
+        "pre_dp_phi": tv_ph1,
+        "post_dp_r": tv_r2,
+        "post_dp_theta": tv_th2,
+        "post_dp_phi": tv_ph2,
     }
 
 def main():
@@ -143,13 +141,13 @@ def main():
     print(f"Pitcher {result['pitcher']} | {result['target']} vs {result['reference']} ({result['handedness']}HH)")
     print(f"Decision time: {result['decision_time_ms']:.0f} ms")
     print("Pre-decision (0 → decision):")
-    print(f"  r:     net={result['pre_dp_net_r']:.4f} ft   total_var={result['pre_dp_tv_r']:.4f} ft")
-    print(f"  theta: net={result['pre_dp_net_theta']:.4f} rad  total_var={result['pre_dp_tv_theta']:.4f} rad")
-    print(f"  phi:   net={result['pre_dp_net_phi']:.4f} rad  total_var={result['pre_dp_tv_phi']:.4f} rad")
+    print(f"  r:     {result['pre_dp_r']:.4f} ft")
+    print(f"  theta: {result['pre_dp_theta']:.4f} rad")
+    print(f"  phi:   {result['pre_dp_phi']:.4f} rad")
     print("Post-decision (decision → +100 ms):")
-    print(f"  r:     net={result['post_dp_net_r']:.4f} ft   total_var={result['post_dp_tv_r']:.4f} ft")
-    print(f"  theta: net={result['post_dp_net_theta']:.4f} rad  total_var={result['post_dp_tv_theta']:.4f} rad")
-    print(f"  phi:   net={result['post_dp_net_phi']:.4f} rad  total_var={result['post_dp_tv_phi']:.4f} rad")
+    print(f"  r:     {result['post_dp_r']:.4f} ft")
+    print(f"  theta: {result['post_dp_theta']:.4f} rad")
+    print(f"  phi:   {result['post_dp_phi']:.4f} rad")
 
 if __name__ == "__main__":
     main()
