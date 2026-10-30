@@ -9,10 +9,10 @@ polar_transformations.to_polar for the chosen handedness.
 
 View settings (approved):
   - elev = 2
-  - azim = 88 for RHH, 92 for LHH
+  - azim = 85.3 for RHH, 94.7 for LHH
   - equal pixel-per-foot scale (box aspect matches data ranges)
   - thin trajectory lines
-  - strike zone box at shifted y=0.5, Statcast z=1.5–4.0 ft, 17" wide
+  - strike zone box at shifted y=0.5, Statcast z=1.5–3.04 ft, 17" wide
   - axes inverted so +x is right and +y is into the page
   - tight crop to remove whitespace
 
@@ -42,7 +42,7 @@ ORIGIN_X_LHH = 35.8 * IN_TO_FT
 
 # Approved view angles
 ELEV = 2
-AZIM = {"R": 88, "L": 92}
+AZIM = {"R": 85.3, "L": 94.7}
 
 
 def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
@@ -61,7 +61,7 @@ def _strike_zone(handedness: str, zone_y: float = 0.5):
     half_w = 17.0 * IN_TO_FT / 2.0
     zone_x_stat = np.array([-half_w, half_w, half_w, -half_w, -half_w])
     zone_x = zone_x_stat - ox
-    zone_z_stat = np.array([1.5, 1.5, 4.0, 4.0, 1.5])
+    zone_z_stat = np.array([1.5, 1.5, 3.04, 3.04, 1.5])
     zone_z = zone_z_stat - ORIGIN_Z
     zone_y_arr = np.full_like(zone_x, zone_y)
     return zone_x, zone_y_arr, zone_z
@@ -104,8 +104,8 @@ def plot_trajectories(
     h = handedness.upper()
     azim = AZIM.get(h, 88)
 
-    fig = plt.figure(figsize=(8, 8))
-    ax = fig.add_axes([0.0, 0.0, 1.0, 1.0], projection="3d")
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_axes([0.02, 0.02, 0.96, 0.96], projection="3d")
 
     shifted_list = []
     for traj, label, color in zip(trajectories, labels, colors):
@@ -162,27 +162,35 @@ def plot_trajectories(
 
     if output_path:
         tmp = "/tmp/_plot_raw.png"
-        plt.savefig(tmp, dpi=200, facecolor="white", bbox_inches="tight", pad_inches=0)
+        plt.savefig(tmp, dpi=250, facecolor="white", bbox_inches="tight", pad_inches=0.05)
         plt.close()
-        # Tight crop
         im = Image.open(tmp).convert("RGB")
         arr = np.array(im)
-        mask = np.any(arr < 240, axis=2)
+        # More aggressive mask: anything not near-white
+        mask = np.any(arr < 250, axis=2)
         rows = np.any(mask, axis=1)
         cols = np.any(mask, axis=0)
         if rows.any() and cols.any():
             rmin, rmax = np.where(rows)[0][[0, -1]]
             cmin, cmax = np.where(cols)[0][[0, -1]]
-            margin = 10
+            # Small margin only
+            margin = 8
             rmin = max(0, rmin - margin)
             rmax = min(arr.shape[0] - 1, rmax + margin)
             cmin = max(0, cmin - margin)
             cmax = min(arr.shape[1] - 1, cmax + margin)
             im = im.crop((cmin, rmin, cmax + 1, rmax + 1))
+        # Force square and large
         w, h_px = im.size
-        scale = 1200 / max(w, h_px)
-        im = im.resize((int(w * scale), int(h_px * scale)), Image.LANCZOS)
-        im.save(output_path)
+        side = max(w, h_px, 1000)
+        canvas = Image.new("RGB", (side, side), "white")
+        # Paste centered
+        x_off = (side - w) // 2
+        y_off = (side - h_px) // 2
+        canvas.paste(im, (x_off, y_off))
+        # Final resize to consistent large size
+        canvas = canvas.resize((1200, 1200), Image.LANCZOS)
+        canvas.save(output_path)
         print(f"Saved {output_path}")
     else:
         plt.show()
