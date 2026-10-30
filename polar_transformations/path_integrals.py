@@ -124,12 +124,12 @@ def path_integrals(pitcher_id: int, target_type: str, handedness: str = "R") -> 
         "target": target_type,
         "handedness": handedness.upper(),
         "decision_time_ms": t_dec * 1000,
-        "pre_net_r": net_r1, "pre_tv_r": tv_r1,
-        "pre_net_theta": net_th1, "pre_tv_theta": tv_th1,
-        "pre_net_phi": net_ph1, "pre_tv_phi": tv_ph1,
-        "post_net_r": net_r2, "post_tv_r": tv_r2,
-        "post_net_theta": net_th2, "post_tv_theta": tv_th2,
-        "post_net_phi": net_ph2, "post_tv_phi": tv_ph2,
+        "pre_dp_net_r": net_r1, "pre_dp_tv_r": tv_r1,
+        "pre_dp_net_theta": net_th1, "pre_dp_tv_theta": tv_th1,
+        "pre_dp_net_phi": net_ph1, "pre_dp_tv_phi": tv_ph1,
+        "post_dp_net_r": net_r2, "post_dp_tv_r": tv_r2,
+        "post_dp_net_theta": net_th2, "post_dp_tv_theta": tv_th2,
+        "post_dp_net_phi": net_ph2, "post_dp_tv_phi": tv_ph2,
     }
 
 def main():
@@ -143,13 +143,13 @@ def main():
     print(f"Pitcher {result['pitcher']} | {result['target']} vs {result['reference']} ({result['handedness']}HH)")
     print(f"Decision time: {result['decision_time_ms']:.0f} ms")
     print("Pre-decision (0 → decision):")
-    print(f"  r:     net={result['pre_net_r']:.4f} ft   total_var={result['pre_tv_r']:.4f} ft")
-    print(f"  theta: net={result['pre_net_theta']:.4f} rad  total_var={result['pre_tv_theta']:.4f} rad")
-    print(f"  phi:   net={result['pre_net_phi']:.4f} rad  total_var={result['pre_tv_phi']:.4f} rad")
+    print(f"  r:     net={result['pre_dp_net_r']:.4f} ft   total_var={result['pre_dp_tv_r']:.4f} ft")
+    print(f"  theta: net={result['pre_dp_net_theta']:.4f} rad  total_var={result['pre_dp_tv_theta']:.4f} rad")
+    print(f"  phi:   net={result['pre_dp_net_phi']:.4f} rad  total_var={result['pre_dp_tv_phi']:.4f} rad")
     print("Post-decision (decision → +100 ms):")
-    print(f"  r:     net={result['post_net_r']:.4f} ft   total_var={result['post_tv_r']:.4f} ft")
-    print(f"  theta: net={result['post_net_theta']:.4f} rad  total_var={result['post_tv_theta']:.4f} rad")
-    print(f"  phi:   net={result['post_net_phi']:.4f} rad  total_var={result['post_tv_phi']:.4f} rad")
+    print(f"  r:     net={result['post_dp_net_r']:.4f} ft   total_var={result['post_dp_tv_r']:.4f} ft")
+    print(f"  theta: net={result['post_dp_net_theta']:.4f} rad  total_var={result['post_dp_tv_theta']:.4f} rad")
+    print(f"  phi:   net={result['post_dp_net_phi']:.4f} rad  total_var={result['post_dp_tv_phi']:.4f} rad")
 
 if __name__ == "__main__":
     main()
