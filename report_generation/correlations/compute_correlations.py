@@ -14,7 +14,7 @@ from scipy import stats
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-PITCH_FILES = sorted(glob.glob("datamining/outputs/pitches_2025_*.csv"))
+PITCH_FILE = "datamining/outputs/pitches_2025.csv"
 INTEGRALS_PATH = Path("datamining/outputs/path_integrals_2025.csv")
 OUT_DIR = Path("report_generation/correlations/plots")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -30,19 +30,15 @@ CALLED_STRIKE = {"called_strike"}
 
 
 def compute_pitch_metrics() -> pd.DataFrame:
-    """Aggregate whiff%, swing%, CSW% per pitcher + pitch_type."""
-    frames = []
-    for f in PITCH_FILES:
-        df = pd.read_csv(f, usecols=["pitcher", "pitch_type", "description"])
-        frames.append(df)
-    pitches = pd.concat(frames, ignore_index=True)
-    pitches = pitches.dropna(subset=["pitch_type"])
+    """Aggregate whiff%, swing%, CSW% per pitcher + pitch_type + stand (handedness)."""
+    pitches = pd.read_csv(PITCH_FILE, usecols=["pitcher", "pitch_type", "description", "stand"])
+    pitches = pitches.dropna(subset=["pitch_type", "stand"])
 
     pitches["is_swing"] = pitches["description"].isin(SWING_DESCS)
     pitches["is_whiff"] = pitches["description"].isin(WHIFF_DESCS)
     pitches["is_called_strike"] = pitches["description"].isin(CALLED_STRIKE)
 
-    agg = pitches.groupby(["pitcher", "pitch_type"]).agg(
+    agg = pitches.groupby(["pitcher", "pitch_type", "stand"]).agg(
         n_pitches=("description", "size"),
         swings=("is_swing", "sum"),
         whiffs=("is_whiff", "sum"),
@@ -64,12 +60,12 @@ def main():
     # Join on pitcher and target pitch type
     merged = integrals.merge(
         metrics,
-        left_on=["pitcher", "target"],
-        right_on=["pitcher", "pitch_type"],
+        left_on=["pitcher", "target", "handedness"],
+        right_on=["pitcher", "pitch_type", "stand"],
         how="inner",
     )
     # Filter to reasonable sample size
-    merged = merged[merged["n_pitches"] >= 50].copy()
+    merged = merged[merged["n_pitches"] >= 30].copy()  # slightly lower threshold since split by handedness
     print(f"Merged rows with >=50 pitches: {len(merged)}")
 
     integral_cols = [

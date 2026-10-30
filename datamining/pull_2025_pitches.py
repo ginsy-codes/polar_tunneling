@@ -49,6 +49,7 @@ COLUMNS = [
     "description",      # per-pitch outcome
     "events",           # plate-appearance outcome (null on non-terminal pitches)
     # Useful extras
+    "stand",
     "pitch_type",
     "game_date",
     "game_pk",

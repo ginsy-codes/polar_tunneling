@@ -44,6 +44,7 @@ COLUMNS = [
     "plate_z",
     "description",
     "events",
+    "stand",
     "pitch_type",
     "game_date",
     "game_pk",
