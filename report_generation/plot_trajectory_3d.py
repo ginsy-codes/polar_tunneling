@@ -7,13 +7,14 @@ Input: a DataFrame (or list of DataFrames) with columns t, x, y, z
 The plot origin (0, 0, 0) is exactly the batter's eye position defined in
 polar_transformations.to_polar for the chosen handedness.
 
-The coordinate system is rotated so the vector from the batter's eye to the
-pitcher release point points directly into the page (positive depth).
-Vertical is constrained so the original +z (up) remains positive vertical.
-The horizontal axis is justified to the most negative of:
-  - the batter eye (origin)
-  - the release point
-  - the most-negative point on the trajectory
+View settings (approved):
+  - elev = 2
+  - azim = 88 for RHH, 92 for LHH
+  - equal pixel-per-foot scale (box aspect matches data ranges)
+  - thin trajectory lines
+  - strike zone box at shifted y=0.5, Statcast z=1.5–4.0 ft, 17" wide
+  - axes inverted so +x is right and +y is into the page
+  - tight crop to remove whitespace
 
 Usage (as library):
     from report_generation.plot_trajectory_3d import plot_trajectories
@@ -30,14 +31,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+from PIL import Image
 
 # Origins in feet (matching to_polar.py)
-# RHH stands on the negative-x side in Statcast coordinates
 IN_TO_FT = 1.0 / 12.0
 ORIGIN_Z = 65.0 * IN_TO_FT
 ORIGIN_Y = -28.3 * IN_TO_FT
 ORIGIN_X_RHH = -35.8 * IN_TO_FT
 ORIGIN_X_LHH = 35.8 * IN_TO_FT
+
+# Approved view angles
+ELEV = 2
+AZIM = {"R": 88, "L": 92}
+
 
 def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
     """Return a copy of traj with coordinates relative to the batter origin."""
@@ -48,142 +54,156 @@ def _shift_to_viewpoint(traj: pd.DataFrame, handedness: str) -> pd.DataFrame:
     shifted["z"] = traj["z"] - ORIGIN_Z
     return shifted
 
-def _rotate_so_release_is_depth(traj: pd.DataFrame) -> pd.DataFrame:
-    """
-    Rotate so the release point lies on the positive depth axis, while keeping
-    the new vertical axis oriented with the original +z (up).
-    """
-    rx, ry, rz = traj.iloc[0][["x", "y", "z"]].to_numpy()
-    v = np.array([rx, ry, rz])
-    norm = np.linalg.norm(v)
-    if norm < 1e-6:
-        return traj.copy()
-    depth = v / norm  # positive depth toward release
 
-    # Prefer original +z as the up reference
-    world_up = np.array([0.0, 0.0, 1.0])
-    # Horizontal = depth × up, then flip if needed so it is consistent
-    horiz = np.cross(depth, world_up)
-    if np.linalg.norm(horiz) < 1e-6:
-        # Depth nearly parallel to z; fall back to world x
-        horiz = np.cross(depth, np.array([1.0, 0.0, 0.0]))
-    horiz = horiz / np.linalg.norm(horiz)
+def _strike_zone(handedness: str, zone_y: float = 0.5):
+    """Return (x, y, z) arrays for a strike-zone rectangle in the batter frame."""
+    ox = ORIGIN_X_RHH if handedness.upper() == "R" else ORIGIN_X_LHH
+    half_w = 17.0 * IN_TO_FT / 2.0
+    zone_x_stat = np.array([-half_w, half_w, half_w, -half_w, -half_w])
+    zone_x = zone_x_stat - ox
+    zone_z_stat = np.array([1.5, 1.5, 4.0, 4.0, 1.5])
+    zone_z = zone_z_stat - ORIGIN_Z
+    zone_y_arr = np.full_like(zone_x, zone_y)
+    return zone_x, zone_y_arr, zone_z
 
-    # Vertical = horiz × depth, then ensure it has positive component along original +z
-    vert = np.cross(horiz, depth)
-    vert = vert / np.linalg.norm(vert)
-    if vert[2] < 0:
-        vert = -vert
-        horiz = -horiz  # keep right-handed
-
-    pts = traj[["x", "y", "z"]].to_numpy()
-    new_x = pts @ horiz
-    new_y = pts @ depth
-    new_z = pts @ vert
-
-    out = traj.copy()
-    out["x"] = new_x
-    out["y"] = new_y
-    out["z"] = new_z
-    return out
 
 def plot_trajectories(
     trajectories,
     handedness: str = "R",
     labels=None,
-    title=None,
-    output_path=None,
-    show=True,
+    colors=None,
+    output_path: str | None = None,
+    show_zone: bool = True,
+    linewidth: float = 1.2,
 ):
     """
-    Plot one or more trajectories in 3D from the batter's viewpoint.
-    The origin (0, 0, 0) is exactly the batter's eye.
-    The view is rotated so the eye-to-release line points into the page,
-    and original +z remains upward.
+    Plot one or more trajectories from the chosen batter viewpoint.
+
+    Parameters
+    ----------
+    trajectories : DataFrame or list of DataFrame
+        Each must have columns x, y, z (and optionally t).
+    handedness : 'R' or 'L'
+    labels : list of str, optional
+    colors : list of colors, optional
+    output_path : str, optional
+        If given, save a tightly cropped PNG here.
+    show_zone : bool
+        Draw the strike-zone box.
+    linewidth : float
+        Line width for trajectories.
     """
     if isinstance(trajectories, pd.DataFrame):
         trajectories = [trajectories]
+    n = len(trajectories)
+    if labels is None:
+        labels = [None] * n
+    if colors is None:
+        colors = [None] * n
 
-    handedness = handedness.upper()
-    if handedness not in ("R", "L"):
-        raise ValueError("handedness must be 'R' or 'L'")
+    h = handedness.upper()
+    azim = AZIM.get(h, 88)
 
-    if title is None:
-        title = f"Pitch Trajectories ({handedness}HH viewpoint)"
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_axes([0.0, 0.0, 1.0, 1.0], projection="3d")
 
-    fig = plt.figure(figsize=(12, 9))
-    ax = fig.add_axes([0.02, 0.02, 0.96, 0.90], projection="3d")
+    shifted_list = []
+    for traj, label, color in zip(trajectories, labels, colors):
+        shifted = _shift_to_viewpoint(traj, h)
+        shifted_list.append(shifted)
+        kw = {"linewidth": linewidth}
+        if label:
+            kw["label"] = label
+        if color:
+            kw["color"] = color
+        ax.plot(shifted["x"], shifted["y"], shifted["z"], **kw)
 
-    all_x, all_y, all_z = [0.0], [0.0], [0.0]
-    release_xs = [0.0]
+    if show_zone:
+        zx, zy, zz = _strike_zone(h)
+        ax.plot(zx, zy, zz, color="black", linewidth=2)
 
-    for i, traj in enumerate(trajectories):
-        shifted = _shift_to_viewpoint(traj, handedness)
-        rotated = _rotate_so_release_is_depth(shifted)
-        label = labels[i] if labels and i < len(labels) else f"Pitch {i+1}"
-        ax.plot(rotated["x"], rotated["y"], rotated["z"], label=label, linewidth=2)
-        all_x.extend(rotated["x"])
-        all_y.extend(rotated["y"])
-        all_z.extend(rotated["z"])
-        release_xs.append(rotated.iloc[0]["x"])
+    ax.view_init(elev=ELEV, azim=azim)
 
-    # Most-negative horizontal reference among origin, release, and trajectory
-    candidates = [0.0, min(release_xs), min(all_x)]
-    x_left = min(candidates)
-    pad = 1.0
-    x_min = x_left
-    x_max = max(all_x)
-    y_min, y_max = min(all_y), max(all_y)
-    z_min, z_max = min(all_z), max(all_z)
+    # Limits from all trajectories + zone
+    all_x = pd.concat([s["x"] for s in shifted_list])
+    all_y = pd.concat([s["y"] for s in shifted_list])
+    all_z = pd.concat([s["z"] for s in shifted_list])
+    if show_zone:
+        zx, zy, zz = _strike_zone(h)
+        all_x = pd.concat([all_x, pd.Series(zx)])
+        all_y = pd.concat([all_y, pd.Series(zy)])
+        all_z = pd.concat([all_z, pd.Series(zz)])
 
-    ax.set_xlim(x_min - pad, x_max + pad)
-    ax.set_ylim(y_min - pad, y_max + pad)
-    ax.set_zlim(z_min - pad, z_max + pad)
+    pad = 0.5
+    x_min, x_max = all_x.min() - pad, all_x.max() + pad
+    y_min, y_max = all_y.min() - pad, all_y.max() + pad
+    z_min, z_max = all_z.min() - pad, all_z.max() + pad
 
-    # Mark the origin (batter's eye)
-    ax.scatter([0], [0], [0], color="red", s=80, label="Batter eye")
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_zlim(z_min, z_max)
+    ax.set_box_aspect([x_max - x_min, y_max - y_min, z_max - z_min])
+    ax.invert_xaxis()
+    ax.invert_yaxis()
 
-    ax.set_xlabel("horizontal (ft)", fontsize=11, labelpad=6)
-    ax.set_ylabel("")  # depth labels are illegible when looking down the tunnel
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.set_zlabel("")
+    ax.set_xticklabels([])
     ax.set_yticklabels([])
-    ax.set_zlabel("vertical (ft)", fontsize=11, labelpad=6)
-    ax.set_title(title, fontsize=13, pad=8)
-    ax.legend(loc="upper right", fontsize=10)
+    ax.set_zticklabels([])
+    ax.grid(False)
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
 
-    # Look along positive depth (eye -> release points into the page)
-    ax.view_init(elev=0, azim=-90)
+    if any(labels):
+        ax.legend(loc="upper left", fontsize=11, framealpha=0.9)
 
     if output_path:
-        plt.savefig(output_path, dpi=150, bbox_inches="tight")
-        print(f"Saved plot to {output_path}")
-
-    if show:
-        plt.show()
-    else:
+        tmp = "/tmp/_plot_raw.png"
+        plt.savefig(tmp, dpi=200, facecolor="white", bbox_inches="tight", pad_inches=0)
         plt.close()
+        # Tight crop
+        im = Image.open(tmp).convert("RGB")
+        arr = np.array(im)
+        mask = np.any(arr < 240, axis=2)
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        if rows.any() and cols.any():
+            rmin, rmax = np.where(rows)[0][[0, -1]]
+            cmin, cmax = np.where(cols)[0][[0, -1]]
+            margin = 10
+            rmin = max(0, rmin - margin)
+            rmax = min(arr.shape[0] - 1, rmax + margin)
+            cmin = max(0, cmin - margin)
+            cmax = min(arr.shape[1] - 1, cmax + margin)
+            im = im.crop((cmin, rmin, cmax + 1, rmax + 1))
+        w, h_px = im.size
+        scale = 1200 / max(w, h_px)
+        im = im.resize((int(w * scale), int(h_px * scale)), Image.LANCZOS)
+        im.save(output_path)
+        print(f"Saved {output_path}")
+    else:
+        plt.show()
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Plot a 3D pitch trajectory from batter viewpoint")
-    parser.add_argument("csv", type=str, help="Path to trajectory CSV (columns: t, x, y, z)")
-    parser.add_argument("--handedness", type=str, default="R", choices=["R", "L", "r", "l"],
-                        help="Batter handedness for viewpoint origin")
-    parser.add_argument("--output", type=str, default=None, help="Save figure to this path")
-    parser.add_argument("--title", type=str, default=None)
-    parser.add_argument("--no-show", action="store_true")
+    parser = argparse.ArgumentParser(description="Plot pitch trajectories from batter viewpoint")
+    parser.add_argument("csv", help="CSV with columns x, y, z")
+    parser.add_argument("--handedness", default="R", choices=["R", "L"])
+    parser.add_argument("--output", default="plot.png")
+    parser.add_argument("--no-zone", action="store_true")
     args = parser.parse_args()
 
     traj = pd.read_csv(args.csv)
-    required = {"x", "y", "z"}
-    if not required.issubset(traj.columns):
-        raise ValueError(f"CSV must contain columns {required}")
-
     plot_trajectories(
         traj,
         handedness=args.handedness,
-        title=args.title,
         output_path=args.output,
-        show=not args.no_show,
+        show_zone=not args.no_zone,
     )
+
 
 if __name__ == "__main__":
     main()
